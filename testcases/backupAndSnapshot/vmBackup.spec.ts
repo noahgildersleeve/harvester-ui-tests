@@ -2,23 +2,59 @@ import { onlyOn } from "@cypress/skip-test";
 import { VmsPage } from "@/pageobjects/virtualmachine.po";
 import VMBackup from '@/pageobjects/vmBackup.po';
 import { PageUrl } from "@/constants/constants";
+import SettingsPagePo from "@/pageobjects/settings.po";
+import { generateName } from "@/utils/utils";
 
 const vms = new VmsPage();
 const vmBackups = new VMBackup();
+const settings = new SettingsPagePo();
 
 describe('VM Backup Validation', () => {
-  const vmName = 'test';
-  let createVMBackupSuccess: boolean = false ;
-  const vmBackupName = 'test-vm-backup';
+  // Unique names generated once per suite run — shared across all it() blocks
+  const vmName = generateName('test-vm');
+  const vmBackupName = generateName('test-vm-backup');
+  const namespace = 'default';
+
+  let createVMBackupSuccess: boolean = false;
+  let backupTargetSetByTest: boolean = false;
+
+  before(() => {
+    // Ensure backup target is configured before running any backup tests
+    cy.login({ url: PageUrl.setting });
+    cy.request({
+      method: 'GET',
+      url: '/v1/harvester/harvesterhci.io.settings/backup-target',
+    }).then((res) => {
+      let parsed: any = {};
+      try { parsed = JSON.parse(res.body?.value); } catch (e) {}
+
+      if (!parsed?.endpoint) {
+        cy.log('Backup target not configured — setting NFS backup target');
+        settings.clickMenu('backup-target', 'Edit Setting', 'backup-target');
+        settings.setNFSBackupTarget('NFS', Cypress.env('nfsEndPoint'));
+        settings.update('backup-target');
+        backupTargetSetByTest = true;
+      } else {
+        cy.log(`Backup target already configured: ${parsed.type || 'unknown type'}`);
+      }
+    });
+  });
+
+  after(() => {
+    // Only clear the backup target if this test suite was the one that set it
+    if (backupTargetSetByTest) {
+      cy.log('Clearing backup target set by this test suite');
+      cy.login({ url: PageUrl.setting });
+      settings.clearBackupTarget();
+    }
+  });
 
   beforeEach(() => {
     cy.login({url: PageUrl.virtualMachine});
+    vms.init();
   });
 
   it('Take a vm backup from vm', () => {
-    // Create a vm to test the backup operation
-    const namespace = 'default';
-
     const id = `${namespace}/${vmName}`;
     const imageEnv = Cypress.env('image');
     const volume = [{
@@ -28,8 +64,8 @@ describe('VM Backup Validation', () => {
       image: `default/${Cypress._.toLower(imageEnv.name)}`,
     }];
 
-    vmBackups.deleteFromStore(`${namespace}/${vmBackupName}`)
-    vms.deleteVMFromStore(id)
+    vmBackups.deleteFromStore(`${namespace}/${vmBackupName}`);
+    vms.deleteVMFromStore(id);
     vms.goToCreate();
     vms.deleteVMFromStore(`${namespace}/${vmName}`);
     vms.setNameNsDescription(vmName, namespace);
@@ -37,64 +73,63 @@ describe('VM Backup Validation', () => {
     vms.setVolumes(volume);
     vms.save();
 
-    // create a vm snapshot
+    // Wait for VM to be running, then take backup
     vms.checkVMState(vmName, 'Running');
     vms.clickVMBackupAction(vmName, vmBackupName);
 
-    // check vm snapshot
+    // Verify backup appears in the backup list filtered by its unique name
     vmBackups.goToList();
-    // vmBackups.checkState(vmBackupName, vmName);
     vmBackups.censorInColumn(vmBackupName, 3, namespace, 4, vmName, 5, { timeout: 5000, nameSelector: 'a' });
 
-    createVMBackupSuccess = true
+    createVMBackupSuccess = true;
   })
 
   it('Restore new VM from vm backup', () => {
     onlyOn(createVMBackupSuccess);
-    
-    const newVMName = 'create-new-from-backup';
 
-    vms.deleteVMFromStore(`default/${newVMName}`)
+    const newVMName = generateName('restore-new');
+
+    vms.deleteVMFromStore(`${namespace}/${newVMName}`);
     vmBackups.goToList();
     vmBackups.restoreNew(vmBackupName, newVMName);
     vms.checkVMState(newVMName);
 
     // delete vm
-    vms.deleteVMFromStore(`default/${newVMName}`);
+    vms.deleteVMFromStore(`${namespace}/${newVMName}`);
   })
 
   it('Restore New VM in another namespace from vm backup', () => {
     onlyOn(createVMBackupSuccess);
-    
-    const newVMName = 'create-new-from-backup';
 
-    vms.deleteVMFromStore(`default/${newVMName}`)
+    const newVMName = generateName('restore-new-ns');
+
+    vms.deleteVMFromStore(`${namespace}/${newVMName}`);
     vmBackups.goToList();
     vmBackups.restoreNew(vmBackupName, newVMName, 'harvester-public');
     vms.checkVMState(newVMName);
 
     // delete vm
-    vms.deleteVMFromStore(`default/${newVMName}`);
+    vms.deleteVMFromStore(`${namespace}/${newVMName}`);
   })
 
   it('Restore Existing VM from vm backup', () => {
     onlyOn(createVMBackupSuccess);
-    
+
     vms.goToList();
     vms.clickAction(vmName, 'Stop');
-    vms.checkVMState(vmName, 'Off')
+    vms.checkVMState(vmName, 'Off');
     vmBackups.goToList();
     vmBackups.restoreExistingVM(vmBackupName);
     vms.checkVMState(vmName);
 
     // delete vm
-    vms.deleteVMFromStore(`default/test`);
+    vms.deleteVMFromStore(`${namespace}/${vmName}`);
   })
 
   it('Delete backup', () => {
     onlyOn(createVMBackupSuccess);
-    
+
     vmBackups.goToList();
-    vmBackups.deleteFromStore(`default/${vmBackupName}`);
+    vmBackups.deleteFromStore(`${namespace}/${vmBackupName}`);
   })
 })

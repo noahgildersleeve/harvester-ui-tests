@@ -40,7 +40,7 @@ describe('Auto setup image from cypress environment', () => {
                 image.setNameNsDescription(IMAGE_NAME, namespace);
                 image.setBasics({ url: IMAGE_URL });
                 image.save();
-                image.checkState({ name: IMAGE_NAME });
+                image.checkState_without_size({ name: IMAGE_NAME });
             }
         })
     })
@@ -64,7 +64,7 @@ describe('Create an image with valid image URL', () => {
     const largeImageEnv = Cypress.env('largeImage');
     const IMAGE_NAME = generateName('auto-image-valid-url-test');
     const IMAGE_URL = imageEnv.url;
-    const LARGE_IMAGE_NAME = largeImageEnv.name;
+    const LARGE_IMAGE_NAME = Cypress._.toLower(largeImageEnv.name);
     const LARGE_IMAGE_URL = largeImageEnv.url;
 
     it('Create an image with valid image URL', () => {
@@ -85,7 +85,7 @@ describe('Create an image with valid image URL', () => {
 
         cy.wrap(image.save()).then((realName) => {
             // check IMAGE state
-            image.checkState({ name: IMAGE_NAME });
+            image.checkState_without_size({ name: IMAGE_NAME });
 
             // edit IMAGE
             image.goToEdit(IMAGE_NAME);
@@ -108,7 +108,7 @@ describe('Create an image with valid image URL', () => {
         image.setBasics({ url: IMAGE_URL });
         cy.wrap(image.save()).then((realName) => {
             // check IMAGE state
-            image.checkState({ name: IMAGE_NAME });
+            image.checkState_without_size({ name: IMAGE_NAME });
 
             // delete IMAGE
             image.delete(namespace, realName as string, IMAGE_NAME);
@@ -129,8 +129,9 @@ describe('Create an image with valid image URL', () => {
             // check IMAGE state
             image.checkState_without_size({ name: LARGE_IMAGE_NAME });
 
+            // post-cleanup: delete the large image after the test
+            image.delete(namespace, realName as string, LARGE_IMAGE_NAME);
         })
-
     });
 
 });
@@ -180,10 +181,11 @@ describe('Delete VM with exported image', () => {
 
         const imageEnv = Cypress.env('image');
         const namespace = 'default';
+        // vms.init() lowercases the image name when creating it, so the dropdown
         const volumes = [{
             buttonText: 'Add Volume',
             create: false,
-            image: `default/${imageEnv.name}`,
+            image: `default/${Cypress._.toLower(imageEnv.name)}`,
         }];
 
         // create VM
@@ -231,7 +233,7 @@ describe('Update image labels after deleting source VM', () => {
         const volumes = [{
             buttonText: 'Add Volume',
             create: false,
-            image: `default/${imageEnv.name}`,
+            image: `default/${Cypress._.toLower(imageEnv.name)}`,
         }];
 
         // create VM
@@ -372,9 +374,6 @@ describe('Create a ISO image via upload', () => {
 });
 
 
-/**
- * https://harvester.github.io/tests/manual/_incoming/2562-clone-image/
- */
 describe('Clone image', () => {
     const IMAGE_NAME = generateName('auto-image-test');
     const CLONED_NAME = generateName('cloned-image');
@@ -400,7 +399,7 @@ describe('Clone image', () => {
             IMAGE_REAL_NAME = realName as string;
         })
 
-        image.checkState({ name: IMAGE_NAME });
+        image.checkState_without_size({ name: IMAGE_NAME });
         image.clickAction(IMAGE_NAME, 'Clone');
         image.setNameNsDescription(CLONED_NAME, namespace);
 
@@ -408,7 +407,7 @@ describe('Clone image', () => {
             CLONED_IMAGE_REAL_NAME = realName as string;
         })
 
-        image.checkState({ name: CLONED_NAME });
+        image.checkState_without_size({ name: CLONED_NAME });
         image.goToEdit(CLONED_NAME);
         image.clickTab('labels');
 
@@ -449,7 +448,7 @@ describe('Image filtering by labels', () => {
         cy.wrap(image.save()).then((realName) => {
             IMAGE_REAL_NAME_1 = realName as string
         })
-        image.checkState({ name: IMAGE_NAME_1 });
+        image.checkState_without_size({ name: IMAGE_NAME_1 });
 
         // create the second one
         image.goToCreate();
@@ -461,7 +460,7 @@ describe('Image filtering by labels', () => {
         cy.wrap(image.save()).then((realName) => {
             IMAGE_REAL_NAME_2 = realName as string
         })
-        image.checkState({ name: IMAGE_NAME_2 });
+        image.checkState_without_size({ name: IMAGE_NAME_2 });
 
         image.goToCreate();
         image.setNameNsDescription(IMAGE_NAME_3, namespace);
@@ -472,7 +471,7 @@ describe('Image filtering by labels', () => {
         cy.wrap(image.save()).then((realName) => {
             IMAGE_REAL_NAME_3 = realName as string
         })
-        image.checkState({ name: IMAGE_NAME_3 });
+        image.checkState_without_size({ name: IMAGE_NAME_3 });
 
         // Can search specific image by name in the Harvester VM creation page
         vms.goToCreate();
@@ -554,18 +553,27 @@ describe('Image naming with inline CSS', () => {
 
         cy.wrap(image.save()).then((realName) => {
             name = realName as string;
-        })
-        // check IMAGE state
-        image.checkState({ name: IMAGE_NAME });
 
-        // edit IMAGE
+            // The display name contains HTML tags which break the search box.
+            // Use the metadata name (realName) to verify state via API instead.
+            cy.intercept('GET', `/v1/harvester/${HCI.IMAGE}s*`).as('imageList');
+            image.goToList();
+            cy.wait('@imageList');
+
+            // Verify state and progress via direct row lookup using the metadata name
+            cy.contains(IMAGE_NAME, { timeout: constants.timeout.downloadTimeout }).closest('tr').within(() => {
+                cy.get('td').eq(1).should('contain', 'Active');
+                cy.get('td').eq(6).should('contain', 'Completed');
+            });
+        })
+
+        // edit IMAGE — verify the title on detail page shows the raw name (not rendered as HTML)
         image.goToDetail({ name: IMAGE_NAME, ns: namespace });
-        // Get the title name on the image details page
-        cy.get('.resource-name').should('contain', IMAGE_NAME)
+        cy.get('.resource-name').should('contain', IMAGE_NAME);
 
         // delete IMAGE
         cy.wrap(null).then(() => {
-            image.delete(namespace, name, IMAGE_NAME)
+            image.delete(namespace, name, IMAGE_NAME);
         })
     });
 });

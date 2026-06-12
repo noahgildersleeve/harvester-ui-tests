@@ -29,8 +29,8 @@ export default class CruResourcePo extends PagePo {
   public footerButtons = '.cru-resource-footer'
   public confirmRemove = '.card-container.prompt-remove'
   public searchInput = '.search'
-  // Some action menus still use old style (.list-unstyled.menu), while other menus are in new style (.dropdownTarget)
-  public actionMenu = '.dropdownTarget[role="menu"], .list-unstyled.menu'
+  // Some action menus still use old style (.list-unstyled.menu), new style (.dropdownTarget), or v-popper (.v-popper__inner)
+  public actionMenu = '.dropdownTarget[role="menu"], .list-unstyled.menu, .v-popper__inner'
   public actionMenuIcon = '.icon-actions'
   public actionButton = '[data-testid="masthead-create"]';
 
@@ -212,10 +212,10 @@ export default class CruResourcePo extends PagePo {
 
     // VM stop/pause actions has to click apply in one more confirmation modal
     if(action?.toLowerCase() === 'stop' || action?.toLowerCase() === 'pause') {
-      cy.get(this.actionMenu).contains(action).click()
+      cy.get(this.actionMenu).contains(action).should('be.visible').click()
       return cy.get('#modals button[data-testid="action-button-async-button"]').click()
     }else{
-      return cy.get(this.actionMenu).contains(action).click()
+      return cy.get(this.actionMenu).contains(action).should('be.visible').click()
     }
    
   }

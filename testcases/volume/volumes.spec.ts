@@ -33,7 +33,7 @@ describe("Create image from Volume", () => {
     const volumes = [{
       buttonText: 'Add Volume',
       create: false,
-      image: `default/${imageEnv.name}`,
+      image: `default/${Cypress._.toLower(imageEnv.name)}`,
     }];
 
     vms.init();
@@ -104,7 +104,7 @@ describe("Create volume root disk VM Image Form", () => {
     // create VOLUME
     volumes.goToCreate();
     volumes.setNameNsDescription(VOLUME_NAME, namespace);
-    volumes.setBasics({ source: 'Virtual Machine Image', image: imageEnv.name, size: '10' });
+    volumes.setBasics({ source: 'Virtual Machine Image', image: Cypress._.toLower(imageEnv.name), size: '10' });
     volumes.save();
 
     // check state
@@ -138,7 +138,7 @@ describe("Delete volume that was attached to VM but now is not", () => {
     const volumesInVM = [{
       buttonText: 'Add Volume',
       create: false,
-      image: `default/${imageEnv.name}`,
+      image: `default/${Cypress._.toLower(imageEnv.name)}`,
     }];
 
     // create VM
@@ -195,7 +195,7 @@ describe("Support Volume Hot Unplug", () => {
     const volumesInVM = [{
       buttonText: 'Add Volume',
       create: false,
-      image: `default/${imageEnv.name}`,
+      image: `default/${Cypress._.toLower(imageEnv.name)}`,
     }];
 
     // create VOLUME
@@ -256,7 +256,7 @@ describe("Edit volume increase size via form", () => {
     const volumesInVM = [{
       buttonText: 'Add Volume',
       create: false,
-      image: `default/${imageEnv.name}`,
+      image: `default/${Cypress._.toLower(imageEnv.name)}`,
       size: '10'
     }];
 

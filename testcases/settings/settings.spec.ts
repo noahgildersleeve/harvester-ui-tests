@@ -9,6 +9,24 @@ describe('Setting Page', () => {
         settings.checkIsCurrentPage();
     })
 
+    afterEach(() => {
+        // cy.request() bypasses the UI so the reset works even when the page itself cannot load.
+        cy.request({
+            method: 'GET',
+            url: '/v1/harvester/harvesterhci.io.settings/ui-source',
+            failOnStatusCode: false,
+        }).then(res => {
+            if (res.status === 200) {
+                cy.request({
+                    method: 'PUT',
+                    url: '/v1/harvester/harvesterhci.io.settings/ui-source',
+                    body: { ...res.body, value: 'bundled' },
+                    failOnStatusCode: false,
+                });
+            }
+        });
+    })
+
     /**
      * https://harvester.github.io/tests/manual/advanced/chage-api-ui-source-bundled/
      * 1. Navigate to the Advanced Settings Page via URL
@@ -68,15 +86,43 @@ describe('Setting Page', () => {
  * https://harvester.github.io/tests/manual/advanced/set-s3-backup-target/
  */
 describe('Set backup target S3', () => {
-    beforeEach(() => {
+    beforeEach(function() {
+        // Skip early — before cy.login() — so no unnecessary session setup or blank page
+        const backupTarget = Cypress.env('backupTarget');
+        if (!backupTarget?.endpoint) {
+            this.skip();
+            return;
+        }
         cy.login({ url: PageUrl.setting });
         settings.checkIsCurrentPage(false);
     })
 
-    it('Set backup target S3', () => {
-        settings.clickMenu('backup-target', 'Edit Setting', 'backup-target');
+    afterEach(() => {
+        // Reset backup-target to default via API.
+        // clearBackupTarget() → clickUseDefaultButton() fails here because Harvester only
+        // renders the "Use the default value" button when the saved value differs from the
+        // default.  If update() returned 422 the setting was never persisted, so the button
+        // never appears and cy.click() receives undefined.
+        cy.request({
+            method: 'GET',
+            url: '/v1/harvester/harvesterhci.io.settings/backup-target',
+            failOnStatusCode: false,
+        }).then(res => {
+            if (res.status === 200) {
+                cy.request({
+                    method: 'PUT',
+                    url: '/v1/harvester/harvesterhci.io.settings/backup-target',
+                    body: { ...res.body, value: '' },
+                    failOnStatusCode: false,
+                }).then(r => cy.log(`Reset backup-target: HTTP ${r.status}`));
+            }
+        });
+    })
 
+    it('Set backup target S3', () => {
         const backupTarget = Cypress.env('backupTarget');
+
+        settings.clickMenu('backup-target', 'Edit Setting', 'backup-target');
         settings.setS3BackupTarget({
             type: 'S3',
             endpoint: backupTarget.endpoint,
@@ -84,7 +130,7 @@ describe('Set backup target S3', () => {
             bucketRegion: backupTarget.bucketRegion,
             accessKeyId: backupTarget.accessKey,
             secretAccessKey: backupTarget.secretKey,
-        })
+        });
 
         settings.update('backup-target');
     });

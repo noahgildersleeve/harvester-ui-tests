@@ -461,11 +461,11 @@ export class VmsPage extends CruResourcePo {
     cy.get('.dropdownTarget').contains('Edit Config').click()
   }
 
-  public edit(name: string, value: ValueInterface) {
+  public edit(name: string, value: ValueInterface, namespace: string = 'default') {
     this.init()
     this.goToEdit(name);
     this.setValue(value);
-    this.save({ edit: true });
+    this.update(`${namespace}/${name}`);
   }
 
   public delete(namespace: string, name: string, displayName?: string, { removeRootDisk, id }: { removeRootDisk?: boolean, id?: string } = { removeRootDisk: true }) {

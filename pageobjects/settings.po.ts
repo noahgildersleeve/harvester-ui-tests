@@ -87,6 +87,12 @@ export default class SettingsPagePo extends CruResource {
       cpu.input(value.cpu)
     }
 
+    clearBackupTarget() {
+        this.goToList();
+        this.clickMenu('backup-target', 'Edit Setting', 'backup-target');
+        this.clickUseDefaultButton();
+    }
+
     setNFSBackupTarget(type: string, endpoint: string) {
         const select = new LabeledSelectPo("section .labeled-select.hoverable", `:contains("Type")`);
         select.select({option: type, selector: '.vs__dropdown-menu'});

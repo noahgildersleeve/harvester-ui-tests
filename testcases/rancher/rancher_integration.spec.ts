@@ -143,20 +143,20 @@ describe('Rancher Integration Test', function () {
     it('Install Harvester UI Extension', { baseUrl: constants.rancherUrl }, () => {
         onlyOn(addUIextensionRepo);
         rancher.rancherLogin();
-        
+
         if (!rancherVersion) {
-            cy.log('Warning: Rancher version not available from previous test');
-            // Either fail the test or fetch it again
+            cy.log('Warning: Rancher version not available from previous test, fetching now');
+            // Fetch rancherVersion and call install inside .then() so it has the correct value
             cy.wrap(rancher.getServerVersion()).then((infoBody) => {
                 const parsedData = JSON.parse(infoBody as string);
                 rancherVersion = parsedData.Version;
                 cy.log(`Fetched Rancher version: ${rancherVersion}`);
+                rancher.install_harvester_ui_extension(constants.harvester_ui_extension_version, rancherVersion);
             });
         } else {
             cy.log(`Using Rancher version: ${rancherVersion}`);
+            rancher.install_harvester_ui_extension(constants.harvester_ui_extension_version, rancherVersion);
         }
-        rancher.install_harvester_ui_extension(constants.harvester_ui_extension_version, rancherVersion);
-
     });
 
     it('Rancher import Harvester', { baseUrl: constants.rancherUrl }, () => {

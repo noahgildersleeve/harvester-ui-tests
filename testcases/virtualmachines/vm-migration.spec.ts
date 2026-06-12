@@ -7,6 +7,7 @@ import VMBackup from '@/pageobjects/vmBackup.po';
 import { generateName } from '@/utils/utils';
 import { Constants } from "@/constants/constants";
 import { host as hostUtil } from '@/utils/utils';
+import { onlyOn } from "@cypress/skip-test";
 
 const vms = new VmsPage();
 const volumePO = new VolumePage();
@@ -14,6 +15,30 @@ const constants = new Constants();
 const namespaces = new NamespacePage();
 const imagePO = new ImagePage();
 const vmBackups = new VMBackup();
+
+const vmNetworkName = `vlan${(Cypress.env('networks') || {})?.vlans?.[0]}`;
+
+let clusterNodeCount = 0;
+
+before(function() {
+  cy.login();
+  cy.request({
+    method: 'GET',
+    url: '/v1/harvester/nodes',
+    headers: { Accept: 'application/json' },
+  }).then((resp) => {
+    const nodeList: any[] = resp.body?.data ?? resp.body?.items ?? [];
+    clusterNodeCount = nodeList.length;
+    if (clusterNodeCount >= 2) {
+      // Ensure the largeImage is available before migration tests run
+      vms.init();
+    }
+  });
+});
+
+beforeEach(function() {
+  if (clusterNodeCount < 2) this.skip();
+});
 
 /**
  * @module testcases/virtualmachines/vm-migration.spec.ts
@@ -41,7 +66,6 @@ describe('VM Live Migration', () => {
   it('Migrate VM with cloud init data', () => {
     const VM_NAME = generateName('test-vm-migrate');
     const NAMESPACE = 'default'
-    const NETWORK = 'vlan1'
     const largeImageEnv = Cypress.env('largeImage');
     const USERDATA = `#cloud-config
 password: password
@@ -53,9 +77,9 @@ sshpwauth: True
       name: VM_NAME,
       cpu: '1',
       memory: '2',
-      image: largeImageEnv.name,
+      image: Cypress._.toLower(largeImageEnv.name),
       networks: [{
-        network: NETWORK,
+        network: vmNetworkName,
       }],
       guestAgent: true,
       namespace: NAMESPACE,
@@ -173,7 +197,6 @@ sshpwauth: True
   it('Migrate VM with one backup', () => {
     const VM_NAME = generateName('test-vm-migrate-backup');
     const NAMESPACE = 'default'
-    const NETWORK = 'vlan1'
     const largeImageEnv = Cypress.env('largeImage');
     const BACKUP_NAME = `backup-${VM_NAME}`;
     const USERDATA = `#cloud-config
@@ -186,9 +209,9 @@ sshpwauth: True
       name: VM_NAME,
       cpu: '1',
       memory: '2',
-      image: largeImageEnv.name,
+      image: Cypress._.toLower(largeImageEnv.name),
       networks: [{
-        network: NETWORK,
+        network: vmNetworkName,
       }],
       guestAgent: true,
       namespace: NAMESPACE,
@@ -323,7 +346,6 @@ sshpwauth: True
   it('Migrate VM has multiple volumes', () => {
     const VM_NAME = generateName('test-vm-migrate-volumes');
     const NAMESPACE = 'default'
-    const NETWORK = 'vlan1'
     const VOLUME_NAME = generateName('migration-vol');
     const largeImageEnv = Cypress.env('largeImage');
     const USERDATA = `#cloud-config
@@ -344,9 +366,9 @@ sshpwauth: True
       name: VM_NAME,
       cpu: '1',
       memory: '2',
-      image: largeImageEnv.name,
+      image: Cypress._.toLower(largeImageEnv.name),
       networks: [{
-        network: NETWORK,
+        network: vmNetworkName,
       }],
       guestAgent: true,
       namespace: NAMESPACE,

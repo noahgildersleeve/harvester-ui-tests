@@ -11,32 +11,33 @@ require('cy-verify-downloads').addCustomCommand();
 
 Cypress.Commands.add('login', (params = {}) => {
     let url = params.url || constants.dashboardUrl;
-    const username = params.username ||   Cypress.env('username');
+    const username = params.username || Cypress.env('username');
     const password = params.password || Cypress.env('password');
-
-    const isDev = Cypress.env('NODE_ENV') === 'dev';
-    const baseUrl = isDev ? Cypress.config('baseUrl') : `${Cypress.config('baseUrl')}/dashboard`;
-    cy.intercept('GET', '/v1-public/authproviders*').as('authProviders');
-    cy.visit(`/auth/login`);
-    cy.wait('@authProviders').then(res => {
-      const { CSRF } = cookie.parse(document.cookie);
-      cy.request({
-        method: 'POST',
-        url: '/v3-public/localProviders/local?action=login',
-        body: {
-          description:"UI session",
-          responseType:"cookie",
-          username,
-          password
-        },
-        headers: {
-          'x-api-csrf': CSRF
-        }
-      }).then(() => {
-        cy.visit(url).log(url); // After successful login, you can switch to the specified page, which is the home page by default
-        cy.get(".dashboard-content .product-name", { timeout: constants.timeout.maxTimeout }).contains("Harvester")
+    
+    cy.session(username, () => {
+      cy.intercept('GET', '/v1-public/authproviders*').as('authProviders');
+      cy.visit(`/auth/login`);
+      cy.wait('@authProviders').then(res => {
+        const { CSRF } = cookie.parse(document.cookie);
+        cy.request({
+          method: 'POST',
+          url: '/v3-public/localProviders/local?action=login',
+          body: {
+            description: "UI session",
+            responseType: "cookie",
+            username,
+            password
+          },
+          headers: {
+            'x-api-csrf': CSRF
+          }
+        });
       });
-    })
+    });
+
+    // Navigate to the target url after session is established/restored
+    cy.visit(url);
+    cy.get(".dashboard-content .product-name", { timeout: constants.timeout.maxTimeout }).contains("Harvester");
 });
 
 Cypress.Commands.add('stopOnFailed', () => {

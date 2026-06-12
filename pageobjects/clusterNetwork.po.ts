@@ -81,11 +81,12 @@ export default class clusterNetworkPage extends CruResource {
     }
 
     /**
-     * Select a NIC from the dropdown
-     * @param nicName - the NIC name to select (e.g., "ens6 (Up)")
+     * Select a NIC from the dropdown by partial name match.
+     * @param nicName - the NIC name or partial name to select (e.g., "eno6")
      */
     public selectNIC(nicName: string) {
-        this.NICs().select({ option: nicName });
+        this.NICs().self().click();
+        cy.get('.vs__dropdown-menu li').contains(nicName).click();
     }
 
     /**
