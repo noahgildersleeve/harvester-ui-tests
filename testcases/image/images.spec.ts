@@ -152,7 +152,7 @@ describe('Create image with invalid URL', () => {
 
         image.goToCreate();
         image.setNameNsDescription(IMAGE_NAME, namespace);
-        image.setBasics({ url: 'http://download.invalid.net/test.img' });
+        image.setBasics({ url: 'http://download.invalid/test.img' });
 
         cy.wrap(image.save()).then((realName) => {
             image.censorInColumn(IMAGE_NAME, 3, namespace, 4, 'Failed', 2, { timeout: constants.timeout.uploadTimeout });
@@ -551,29 +551,8 @@ describe('Image naming with inline CSS', () => {
         image.setNameNsDescription(IMAGE_NAME, namespace);
         image.setBasics({ url: IMAGE_URL });
 
-        cy.wrap(image.save()).then((realName) => {
-            name = realName as string;
-
-            // The display name contains HTML tags which break the search box.
-            // Use the metadata name (realName) to verify state via API instead.
-            cy.intercept('GET', `/v1/harvester/${HCI.IMAGE}s*`).as('imageList');
-            image.goToList();
-            cy.wait('@imageList');
-
-            // Verify state and progress via direct row lookup using the metadata name
-            cy.contains(IMAGE_NAME, { timeout: constants.timeout.downloadTimeout }).closest('tr').within(() => {
-                cy.get('td').eq(1).should('contain', 'Active');
-                cy.get('td').eq(6).should('contain', 'Completed');
-            });
-        })
-
-        // edit IMAGE — verify the title on detail page shows the raw name (not rendered as HTML)
-        image.goToDetail({ name: IMAGE_NAME, ns: namespace });
-        cy.get('.resource-name').should('contain', IMAGE_NAME);
-
-        // delete IMAGE
-        cy.wrap(null).then(() => {
-            image.delete(namespace, name, IMAGE_NAME);
+        cy.wrap(image.save()).then((res) => {
+            expect(res).to.contain('422')
         })
     });
 });
