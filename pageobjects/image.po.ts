@@ -112,7 +112,7 @@ export class ImagePage extends CruResourcePo {
     })
   }
 
-  public save({ upload, edit, depth }: { namespace?: string, buttonText?: string, upload?: boolean; edit?: boolean; depth?: number; } = {}): Promise<string> {
+  public save({ upload, edit, depth }: { namespace?: string, response?: string, buttonText?: string, upload?: boolean; edit?: boolean; depth?: number; } = {}): Promise<string> {
     return new Promise((resolve, reject) => {
       const interceptName = generateName('create');
 
@@ -121,7 +121,12 @@ export class ImagePage extends CruResourcePo {
       cy.wait(`@${interceptName}`).then(async (res) => {
         if (edit && res.response?.statusCode === 409 && depth === 0) {
           await this.save({ upload, edit, depth: depth + 1 })
-        } else {
+        } 
+        else if(res.response?.statusCode === 422) {
+          cy.log(String(res.response?.statusCode))
+          resolve(String(res.response?.statusCode))
+          }
+        else {
           expect(res.response?.statusCode, `Check save success`).to.equal(edit ? 200 : 201);
           resolve(res.response?.body?.metadata?.name || '');
         }
